@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "queue.h"
 
 unsigned int decreaseSum(unsigned int total, unsigned int level)
 {
@@ -36,69 +37,128 @@ void printMatrix(int *m, unsigned int n)
     }
 }
 
+typedef struct
+{
+    unsigned int nodeLinkSource;
+    unsigned int nodeLinkDestination;
+    unsigned int linkCost;
+    unsigned int totalCost;
+    unsigned int totalNumberOfHops;
+} dijkstra_node_t;
+
+int cmpUInt(const void *a, const void *b)
+{
+    unsigned int c = *(unsigned int *)a;
+    unsigned int d = *(unsigned int *)b;
+
+    if (c > d)
+        return 1;
+    else if (c < d)
+        return -1;
+    else
+        return 0;
+}
+
+int cmpDijkstraNode(const void *a, const void *b)
+{
+    dijkstra_node_t *c = (dijkstra_node_t *)a;
+    dijkstra_node_t *d = (dijkstra_node_t *)b;
+    int r;
+
+    if ((r = cmpUInt(&(c->totalCost), &(d->totalCost))) != 0)
+        return r;
+    else if ((r = cmpUInt(&(c->totalNumberOfHops), &(d->totalNumberOfHops))) != 0)
+        return r;
+    else if ((r = cmpUInt(&(c->linkCost), &(d->linkCost))) != 0)
+        return r;
+    else if ((r = cmpUInt(&(c->nodeLinkSource), &(d->nodeLinkSource))) != 0)
+        return r;
+    else if ((r = cmpUInt(&(c->nodeLinkSource), &(d->nodeLinkDestination))) != 0)
+        return r;
+    else
+        return 0;
+}
+
 unsigned int dijkstra(int *m, unsigned int *t, unsigned int n, unsigned int s)
 {
+    Queue_t pq;
+    dijkstra_node_t *dn;
     unsigned char *nodeKnown;
-    unsigned int *nodeMinDis, *nodeNumHops;
-    unsigned int i, j, d, minDis, minI, minJ, minFound, minNumHops, numKnownNodes, numHops;
+    unsigned int i, j, d, numKnownNodes, numHops, lastKnownNode, lastNumHops, lastDis;
     int dis;
 
+    QueueInit(&pq);
+    QueueSetComparer(&pq, cmpDijkstraNode);
     nodeKnown = (unsigned char *)malloc(sizeof(*nodeKnown) * n);
     memset(nodeKnown, 0, sizeof(*nodeKnown) * n);
     nodeKnown[s] = 1;
-    nodeMinDis = (unsigned int *)malloc(sizeof(*nodeMinDis) * n);
-    nodeNumHops = (unsigned int *)malloc(sizeof(*nodeNumHops) * n);
     numKnownNodes = 1;
-    nodeMinDis[s] = 0;
-    nodeNumHops[s] = 0;
     t[s] = n;
+    lastKnownNode = s;
+    lastNumHops = 0;
+    lastDis = 0;
 
     do
     {
-        minDis = (unsigned int)-1;
-        minNumHops = (unsigned int)-1;
-        minFound = 0;
-
-        for (i = 0; i < n; i += 1)
+        i = lastKnownNode;
+        for (j = 0; j < n; j += 1)
         {
-            if (nodeKnown[i] == 0)
+            if (nodeKnown[j] == 1)
                 continue;
-            for (j = 0; j < n; j += 1)
+            if ((dis = m[indexOf(i, j, n)]) >= 0)
             {
-                if (nodeKnown[j] == 1)
-                    continue;
-                if ((dis = m[indexOf(i, j, n)]) >= 0)
-                {
-                    d = dis + nodeMinDis[i];
-                    numHops = nodeNumHops[i] + 1;
-                    printf("[DEBUG] #%u-#%u, L:%d, T:%u, H:%u\n", i + 1, j + 1, dis, d, numHops);
-                    if (d < minDis || (d == minDis && numHops < minNumHops))
-                    {
-                        minDis = d;
-                        minI = i;
-                        minJ = j;
-                        minFound += 1;
-                        minNumHops = numHops;
-                    }
-                }
+                d = dis + lastDis;
+                numHops = lastNumHops + 1;
+
+                dn = (dijkstra_node_t *)malloc(sizeof(*dn));
+                dn->nodeLinkSource = lastKnownNode;
+                dn->nodeLinkDestination = j;
+                dn->linkCost = (unsigned int)dis;
+                dn->totalCost = d;
+                dn->totalNumberOfHops = numHops;
+                printf("#%u-#%u: T:%u, H:%u, L:%u (enqueued)\n", dn->nodeLinkSource + 1, dn->nodeLinkDestination + 1, dn->totalCost, dn->totalNumberOfHops, dn->linkCost);
+
+                QueueEnqueue(&pq, dn);
             }
         }
 
-        if (minFound)
+        while (!QueueEmpty(&pq))
         {
-            t[minJ] = minI;
-            nodeKnown[minJ] = 1;
-            nodeMinDis[minJ] = minDis;
-            numKnownNodes += 1;
-            nodeNumHops[minJ] = minNumHops;
-            printf("[DEBUG] #%u-#%u, L:%u, T:%u, H:%u (final)\n", minI + 1, minJ + 1, (unsigned int)m[indexOf(minI, minJ, n)], minDis, minNumHops);
+            dn = (dijkstra_node_t *)QueueDequeue(&pq);
+
+            if (nodeKnown[dn->nodeLinkDestination])
+            {
+                printf("#%u-#%u: T:%u, H:%u, L:%u (already learned)\n", dn->nodeLinkSource + 1, dn->nodeLinkDestination + 1, dn->totalCost, dn->totalNumberOfHops, dn->linkCost);
+                free(dn);
+            }
+            else
+            {
+                nodeKnown[dn->nodeLinkDestination] = 1;
+                lastKnownNode = dn->nodeLinkDestination;
+                lastNumHops = dn->totalNumberOfHops;
+                lastDis = dn->totalCost;
+                t[dn->nodeLinkDestination] = dn->nodeLinkSource;
+                numKnownNodes += 1;
+
+                printf("#%u-#%u: T:%u, H:%u, L:%u (dequeued)\n", dn->nodeLinkSource + 1, dn->nodeLinkDestination + 1, dn->totalCost, dn->totalNumberOfHops, dn->linkCost);
+                free(dn);
+                break;
+            }
         }
 
-    } while (minFound);
+        if (numKnownNodes == n)
+            break;
+    } while (!QueueEmpty(&pq));
 
     free(nodeKnown);
-    free(nodeMinDis);
-    free(nodeNumHops);
+
+    while (!QueueEmpty(&pq))
+    {
+        dn = (dijkstra_node_t *)QueueDequeue(&pq);
+        printf("#%u-#%u: T:%u, H:%u, L:%u (leftover)\n", dn->nodeLinkSource + 1, dn->nodeLinkDestination + 1, dn->totalCost, dn->totalNumberOfHops, dn->linkCost);
+        free(dn);
+    }
+    QueueDeInit(&pq);
 
     return numKnownNodes;
 }
@@ -171,7 +231,7 @@ int main(void)
             for (p = 0; p < o; p += 1)
             {
                 scanf("%d", m + indexOf(j - 1, j + p, d));
-                printf("[DEBUG] Node #%u to #%u: %u at (%u)\n", j, j + p + 1, (unsigned int)m[indexOf(j - 1, j + p, d)], indexOf(j - 1, j + p, d));
+                printf("[DEBUG] Node #%u to #%u: %d at (%u)\n", j, j + p + 1, m[indexOf(j - 1, j + p, d)], indexOf(j - 1, j + p, d));
             }
         }
         m[k] = 0;
@@ -189,8 +249,9 @@ int main(void)
                 continue;
 
             numHops = dijkstraPath(m, t, path, &dis, d, s, j);
-            printf("Distance from Node #%u to Node #%u: %u\n", s + 1, j + 1, dis);
-            printf("Path: #%u", path[0] + 1);
+            printf("Shortest distance from Node #%u to Node #%u: %u\n", s + 1, j + 1, dis);
+            printf("Shortest Path from Node #%u to Node #%u:\n", s + 1, path[numHops - 1] + 1);
+            printf("#%u", path[0] + 1);
             for (p = 1; p < numHops; p += 1)
             {
                 printf("-#%u", path[p] + 1);

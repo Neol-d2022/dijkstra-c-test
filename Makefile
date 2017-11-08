@@ -3,8 +3,8 @@ CC=gcc
 CFLAGS=-Wall -Wextra -g3
 LFLAGS=
 
-OBJS=dijkstra.o
-DEPS=
+OBJS=dijkstra.o mm.o queue.o
+DEPS=mm.h queue.h
 LIBS=
 
 BIN=dijkstra_test
