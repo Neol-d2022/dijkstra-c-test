@@ -249,14 +249,21 @@ int main(void)
                 continue;
 
             numHops = dijkstraPath(m, t, path, &dis, d, s, j);
-            printf("Shortest distance from Node #%u to Node #%u: %u\n", s + 1, j + 1, dis);
-            printf("Shortest Path from Node #%u to Node #%u:\n", s + 1, path[numHops - 1] + 1);
-            printf("#%u", path[0] + 1);
-            for (p = 1; p < numHops; p += 1)
+            if (numHops)
             {
-                printf("-#%u", path[p] + 1);
+                printf("Shortest distance from Node #%u to Node #%u: %u\n", s + 1, j + 1, dis);
+                printf("Shortest Path from Node #%u to Node #%u:\n", s + 1, j + 1);
+                printf("#%u", path[0] + 1);
+                for (p = 1; p < numHops; p += 1)
+                    printf("-#%u", path[p] + 1);
+                printf("\n\n");
             }
-            printf("\n\n");
+            else
+            {
+                printf("Shortest distance from Node #%u to Node #%u: NO ROUTE\n", s + 1, j + 1);
+                printf("Shortest Path from Node #%u to Node #%u:\n", s + 1, j + 1);
+                printf("NO ROUTE\n\n");
+            }
         }
 
         free(m);
